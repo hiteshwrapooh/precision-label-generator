@@ -1,0 +1,184 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Precision Label Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{--bg:#f3f4f6;--pn:#fff;--tx:#111827;--mu:#6b7280;--bd:#d1d5db;--ac:#1f2937;--ok:#15803d;--er:#b91c1c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--pn:#1a1d23;--tx:#e5e7eb;--mu:#9ca3af;--bd:#374151;--ac:#e5e7eb;--ok:#4ade80;--er:#f87171}}
+:root[data-theme="dark"]{--bg:#0f1115;--pn:#1a1d23;--tx:#e5e7eb;--mu:#9ca3af;--bd:#374151;--ac:#e5e7eb;--ok:#4ade80;--er:#f87171}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px Arial,Helvetica,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:2px solid var(--ac);background:var(--pn)}
+h1{font-size:16px;letter-spacing:.12em;margin:0}h3{margin:14px 0 6px;font-size:12px;letter-spacing:.08em;color:var(--mu);text-transform:uppercase}
+main{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:14px;padding:14px;max-width:1400px;margin:auto}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.p{background:var(--pn);border:1px solid var(--bd);border-radius:6px;padding:12px;margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--mu);margin:8px 0 2px}
+input,select,textarea,button{font:inherit;color:var(--tx);background:var(--pn);border:1px solid var(--bd);border-radius:4px;padding:6px 8px;width:100%}
+button{width:auto;cursor:pointer;background:var(--ac);color:var(--bg);border:0;font-weight:700;padding:7px 12px;margin:3px 3px 3px 0}button.s{background:var(--pn);color:var(--tx);border:1px solid var(--bd)}button:disabled{opacity:.4}
+.r{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.r>*{flex:1;min-width:70px}.r>button{flex:0 0 auto}
+.tabs button{border-radius:4px 4px 0 0}.pv{background:#fff;border:1px solid var(--bd);padding:8px;overflow:auto;text-align:center}.pv svg{max-width:100%;height:auto;display:inline-block}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:4px 8px}.g label{margin:2px 0 0;font-size:11px}
+.bar{height:12px;background:var(--bd);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--ok)}
+#msg{white-space:pre-wrap;font-size:13px;margin-top:6px}.er{color:var(--er)}.ok{color:var(--ok)}
+.tw{max-height:360px;overflow:auto;border:1px solid var(--bd)}table{border-collapse:collapse;width:100%;font-size:12px}td,th{border-bottom:1px solid var(--bd);padding:2px 4px;text-align:left;white-space:nowrap}th{position:sticky;top:0;background:var(--pn)}td input{padding:3px 5px}tr.sel{outline:2px solid var(--ac)}tr.bad{background:rgba(185,28,28,.12)}
+.st{display:flex;gap:18px;flex-wrap:wrap}.st b{display:block;font-size:18px}
+</style></head><body>
+<header><h1>PRECISION LABEL GENERATOR</h1><span><span id="saved" style="color:var(--mu);font-size:12px"></span> <button class="s" onclick="toggleTheme()">Theme</button></span></header>
+<main>
+<section>
+<div class="p">
+<div class="tabs"><button id="t-seq" onclick="setTab('seq')">Sequential</button><button id="t-csv" class="s" onclick="setTab('csv')">CSV Import</button></div>
+<h3>Label data <span style="text-transform:none">(per label)</span></h3>
+<div id="seq">
+<div class="r"><div><label>Starting barcode</label><input id="start" value="0609020"></div><div><label>Number of labels</label><input id="qty" type="number" min="1" max="20000" value="100"></div></div>
+<label>Product name</label><input id="prod" value="KANGAROOJEFF">
+<label>Imported by (company)</label><input id="comp" value="READYSTOCK">
+<label>QR mode</label><select id="qrm"><option value="auto">Product + Imported by</option><option value="custom">Custom content</option></select>
+<textarea id="qrc" rows="3" placeholder="Custom QR content" style="display:none"></textarea>
+<button onclick="generate()" style="margin-top:10px">Generate Labels</button>
+</div>
+<div id="csv" style="display:none">
+<p style="color:var(--mu);font-size:12px">Columns: barcode, product_name, imported_by, qr_content (optional). Barcodes are used exactly as given.</p>
+<input type="file" id="csvf" accept=".csv,text/csv">
+</div>
+<div id="msg"></div>
+</div>
+<div class="p"><h3>Template <span style="text-transform:none">(applies to all labels)</span></h3>
+<label>Header 1</label><input id="hh1"><label>Header 2</label><input id="hh2">
+<div class="r" style="margin-top:8px"><button class="s" onclick="toggleLock()" id="lk">🔒 Lock template</button><button class="s" onclick="undo()">Undo</button><button class="s" onclick="redo()">Redo</button><button class="s" onclick="resetTpl()">Reset to default</button></div>
+<details><summary style="cursor:pointer;margin-top:8px">Customize template</summary><div id="ed"></div></details>
+<h3>Saved templates</h3>
+<div class="r"><input id="tn" placeholder="Template name" value="Readystock Manometry"><select id="tl"></select></div>
+<button class="s" onclick="tSave()">Save</button><button class="s" onclick="tLoad()">Load</button><button class="s" onclick="tDup()">Duplicate</button><button class="s" onclick="tDel()">Delete</button>
+</div>
+</section>
+<section>
+<div class="p"><div class="r"><b id="pt">Preview</b><span style="flex:0 0 auto"><button class="s" onclick="nav(-1)">‹ Prev</button><button class="s" onclick="nav(1)">Next ›</button></span></div>
+<div class="pv" id="pv" style="margin-top:8px"></div>
+<div class="st" style="margin-top:8px"><div>Total<b id="s1">0</b></div><div>First<b id="s2">–</b></div><div>Last<b id="s3">–</b></div><div>Duplicates<b id="s4">–</b></div></div></div>
+<div class="p"><h3>Export</h3>
+<div class="r"><select id="sc"><option value="1">PNG 1× (633×391)</option><option value="2">PNG 2×</option><option value="4">PNG 4× (2532×1564)</option></select><select id="pm"><option value="one">PDF: one per page</option><option value="grid">PDF: 10 per A4 page</option></select></div>
+<button onclick="exPNG()">Download PNG</button><button onclick="exZIP()">Download ZIP</button><button onclick="exPDF()">Download PDF</button><button class="s" onclick="exCSV()">Download CSV</button>
+<div class="bar" style="margin-top:8px"><i id="pb"></i></div><div id="pl" style="font-size:12px;color:var(--mu)"></div>
+<button class="s" onclick="exProj()">Export project</button><label class="s" style="display:inline-block;border:1px solid var(--bd);border-radius:4px;padding:6px 10px;cursor:pointer;color:var(--tx);margin:3px 0">Import project<input type="file" id="pj" accept=".json" style="display:none"></label></div>
+<div class="p"><h3>Labels</h3>
+<div class="r"><input id="q" placeholder="Search barcode / product"><select id="fl"><option value="all">All</option><option value="valid">Valid</option><option value="err">Errors</option><option value="ed">Edited</option></select><label style="margin:0;flex:0 0 auto"><input type="checkbox" id="mb" style="width:auto"> Manual barcode editing</label></div>
+<div class="r" style="margin:8px 0"><input id="bp" placeholder="Bulk product"><input id="bi" placeholder="Bulk imported by"><button class="s" onclick="bulk()">Apply to selected</button></div>
+<div class="tw"><table><thead><tr><th><input type="checkbox" id="ca" style="width:auto"></th><th>#</th><th>Barcode</th><th>Product</th><th>Imported by</th><th>QR content</th></tr></thead><tbody id="tb"></tbody></table></div>
+<div id="tnote" style="font-size:12px;color:var(--mu)"></div></div>
+</section></main>
+<script>
+const $=s=>document.querySelector(s),J=o=>JSON.stringify(o),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DEF={w:633,h:391,
+h1:{text:'HIGH RESOLUTION',x:327,y:46,size:26,weight:700,ls:.5,anchor:'middle'},
+h2:{text:'MANOMETRY',x:327,y:88,size:26,weight:700,ls:.5,anchor:'middle'},
+bc:{type:'CODE128',x:40,y:106,w:553,h:60,bar:2},
+num:{x:373,y:205,size:26,weight:700,ls:11,anchor:'middle'},
+qr:{x:38,y:183,size:178,ecl:'M',quiet:2},
+prod:{x:253,y:267,size:31,weight:700,ls:0,maxw:350},
+imp:{prefix:'IMPORTED BY',x:253,y:303,size:17,weight:400,ls:0,maxw:350}};
+let tpl=JSON.parse(J(DEF)),rows=[],sel=0,hist=[],fut=[],locked=false,last=J(tpl),chk=new Set(),tab='seq',tmr;
+const FF='Arial,Helvetica,sans-serif';
+const qrOf=r=>(r.qr!=null&&r.qr!=='')?r.qr:`${r.product}\n${tpl.imp.prefix} ${r.importer}`;
+function T(o,t,extra=''){const est=t.length*o.size*.6+t.length*(o.ls||0);const fit=(o.maxw&&est>o.maxw)?` textLength="${o.maxw}" lengthAdjust="spacingAndGlyphs"`:'';
+return `<text x="${o.x}" y="${o.y}" font-family="${FF}" font-size="${o.size}" font-weight="${o.weight}" letter-spacing="${o.ls||0}" text-anchor="${o.anchor||'start'}" fill="#000"${fit}>${esc(t)}</text>`}
+function barSVG(v,b){try{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(s,v,{format:b.type,displayValue:false,margin:0,width:b.bar,height:100,background:'#ffffff'});
+return `<svg x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" viewBox="0 0 ${parseFloat(s.getAttribute('width'))} 100" preserveAspectRatio="none">${s.innerHTML}</svg>`}
+catch(e){return `<text x="${b.x}" y="${b.y+20}" font-size="14" fill="#b00">Invalid barcode for ${b.type}</text>`}}
+function qrSVG(t,o){try{const q=qrcode(0,o.ecl);q.addData(t,'Byte');q.make();const n=q.getModuleCount(),k=o.quiet,tot=n+2*k;let d='';
+for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))d+=`M${c+k} ${r+k}h1v1h-1z`;
+return `<svg x="${o.x}" y="${o.y}" width="${o.size}" height="${o.size}" viewBox="0 0 ${tot} ${tot}" shape-rendering="crispEdges"><rect width="${tot}" height="${tot}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`}
+catch(e){return `<text x="${o.x}" y="${o.y+20}" font-size="14" fill="#b00">QR failed (content too long)</text>`}}
+// single source of truth renderer: preview and every export use this
+function svgOf(r){const t=tpl;return `<svg xmlns="http://www.w3.org/2000/svg" width="${t.w}" height="${t.h}" viewBox="0 0 ${t.w} ${t.h}"><rect width="${t.w}" height="${t.h}" fill="#fff"/>${T(t.h1,t.h1.text)}${T(t.h2,t.h2.text)}${barSVG(r.barcode,t.bc)}${T(t.num,r.barcode)}${qrSVG(qrOf(r),t.qr)}${T(t.prod,r.product)}${T(t.imp,t.imp.prefix+' '+r.importer)}</svg>`}
+const live=()=>({barcode:$('#start').value||'0',product:$('#prod').value,importer:$('#comp').value});
+const cur=()=>rows[sel]||live();
+function msg(t,c){const m=$('#msg');m.textContent=t;m.className=c||''}
+function renderPrev(){const r=cur();$('#pv').innerHTML=svgOf(r);$('#pt').textContent=rows.length?`Label ${sel+1} of ${rows.length} — ${r.barcode}`:'Live preview'}
+function errs(){const m=new Map(),c={};rows.forEach(r=>c[r.barcode]=(c[r.barcode]||0)+1);
+rows.forEach((r,i)=>{const e=[];if(!r.barcode)e.push('Missing barcode');if(!r.product)e.push('Missing product name');if(!r.importer)e.push('Missing imported by');if(r.barcode&&c[r.barcode]>1)e.push('Duplicate barcode '+r.barcode);if(e.length)m.set(i,e.join('; '))});return m}
+function renderStats(){const e=errs();$('#s1').textContent=rows.length;$('#s2').textContent=rows[0]?.barcode||'–';$('#s3').textContent=rows.length?rows[rows.length-1].barcode:'–';
+const d=rows.some((r,i)=>(e.get(i)||'').includes('Duplicate'));$('#s4').innerHTML=!rows.length?'–':d?'<span class="er">⚠ found</span>':'<span class="ok">✓ none</span>'}
+function renderTable(){const e=errs(),q=$('#q').value.toLowerCase(),f=$('#fl').value,ro=$('#mb').checked?'':'readonly';let n=0,h='';
+for(let i=0;i<rows.length;i++){const r=rows[i];if(q&&!(r.barcode.toLowerCase().includes(q)||r.product.toLowerCase().includes(q)))continue;
+if(f==='valid'&&e.has(i)||f==='err'&&!e.has(i)||f==='ed'&&!r.ed)continue;if(n++>=300)continue;
+h+=`<tr data-i="${i}" class="${e.has(i)?'bad':''}${i===sel?' sel':''}" title="${esc(e.get(i)||'')}"><td><input type="checkbox" data-f="c" style="width:auto" ${chk.has(i)?'checked':''}></td><td>${i+1}</td><td><input data-f="barcode" value="${esc(r.barcode)}" ${ro}></td><td><input data-f="product" value="${esc(r.product)}"></td><td><input data-f="importer" value="${esc(r.importer)}"></td><td data-q>${esc(qrOf(r).replace(/\n/g,' ⏎ '))}</td></tr>`}
+$('#tb').innerHTML=h;$('#tnote').textContent=rows.length?(n>300?`Showing 300 of ${n} matches — use search to narrow.`:`${n} shown`):''}
+function renderAll(){renderPrev();renderStats();renderTable();save()}
+$('#tb').addEventListener('input',ev=>{const t=ev.target,tr=t.closest('tr'),i=+tr.dataset.i,f=t.dataset.f;if(f==='c'){t.checked?chk.add(i):chk.delete(i);return}
+rows[i][f]=t.value;rows[i].ed=true;tr.querySelector('[data-q]').textContent=qrOf(rows[i]).replace(/\n/g,' ⏎ ');if(f==='barcode'){renderStats();tr.className=errs().has(i)?'bad':''}
+sel=i;renderPrev();save()});
+$('#tb').addEventListener('click',ev=>{const tr=ev.target.closest('tr');if(!tr||ev.target.tagName==='INPUT')return;sel=+tr.dataset.i;renderPrev();document.querySelectorAll('#tb tr').forEach(x=>x.classList.toggle('sel',x===tr))});
+$('#ca').onchange=ev=>{document.querySelectorAll('#tb tr').forEach(tr=>{const i=+tr.dataset.i;ev.target.checked?chk.add(i):chk.delete(i);tr.querySelector('[data-f=c]').checked=ev.target.checked})};
+['q','fl','mb'].forEach(id=>$('#'+id).addEventListener('input',renderTable));
+function bulk(){const p=$('#bp').value,c=$('#bi').value;if(!chk.size)return msg('Select rows first.','er');chk.forEach(i=>{if(p)rows[i].product=p;if(c)rows[i].importer=c;rows[i].ed=true});renderAll();msg(`Updated ${chk.size} labels.`,'ok')}
+function nav(d){if(!rows.length)return;sel=(sel+d+rows.length)%rows.length;renderPrev();renderTable()}
+function setTab(t){tab=t;$('#seq').style.display=t==='seq'?'':'none';$('#csv').style.display=t==='csv'?'':'none';$('#t-seq').className=t==='seq'?'':'s';$('#t-csv').className=t==='csv'?'':'s'}
+$('#qrm').onchange=()=>{$('#qrc').style.display=$('#qrm').value==='custom'?'':'none'};
+['start','prod','comp'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(!rows.length)renderPrev()}));
+function generate(){const s=$('#start').value.trim(),n=+$('#qty').value,p=$('#prod').value.trim(),c=$('#comp').value.trim();
+if(!/^\d+$/.test(s))return msg('Invalid barcode: starting barcode must be digits only (leading zeros are kept).','er');
+if(!Number.isInteger(n)||n<1||n>20000)return msg('Invalid quantity: enter a whole number from 1 to 20,000.','er');
+if(!p)return msg('Product name is empty.','er');if(!c)return msg('Imported by is empty.','er');
+const L=s.length,b=BigInt(s);if((b+BigInt(n-1)).toString().length>L)return msg(`Sequence exceeds the original ${L}-digit format.`,'er');
+const cu=$('#qrm').value==='custom'?$('#qrc').value:null;if($('#qrm').value==='custom'&&!cu.trim())return msg('Custom QR content is empty.','er');
+rows=Array.from({length:n},(_,i)=>({barcode:(b+BigInt(i)).toString().padStart(L,'0'),product:p,importer:c,qr:cu}));sel=0;chk.clear();renderAll();
+msg(`✓ ${n} labels ready: ${rows[0].barcode} → ${rows[n-1].barcode}`,'ok')}
+$('#csvf').onchange=ev=>{const f=ev.target.files[0];if(!f)return;Papa.parse(f,{header:true,skipEmptyLines:true,transformHeader:h=>h.trim().toLowerCase(),complete:res=>{
+const need=['barcode','product_name','imported_by'],miss=need.filter(k=>!res.meta.fields.includes(k));if(miss.length)return msg('Invalid CSV: missing column(s) '+miss.join(', '),'er');
+rows=res.data.map(d=>({barcode:(d.barcode||'').trim(),product:(d.product_name||'').trim(),importer:(d.imported_by||'').trim(),qr:d.qr_content||null}));sel=0;chk.clear();renderAll();
+const e=errs();msg(e.size?`Imported ${rows.length} rows with ${e.size} problem row(s):\n`+[...e].slice(0,8).map(([i,m])=>`Row ${i+1}: ${m}`).join('\n'):`✓ Imported ${rows.length} labels`,e.size?'er':'ok')},error:x=>msg('CSV error: '+x.message,'er')})};
+// ---------- template editor ----------
+function buildEd(){let h='';for(const k in DEF){const o=DEF[k];if(typeof o!=='object')continue;h+=`<h3>${k}</h3><div class="g">`;
+for(const f in o){const v=tpl[k][f],id=`${k}.${f}`;let c;if(f==='type')c=`<select data-k="${id}">${['CODE128','CODE39','EAN13','ITF14'].map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
+else if(f==='ecl')c=`<select data-k="${id}">${['L','M','Q','H'].map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
+else if(f==='anchor')c=`<select data-k="${id}">${['start','middle','end'].map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
+else c=`<input data-k="${id}" ${typeof v==='number'?'type="number" step="any"':''} value="${esc(v)}">`;h+=`<div><label>${f}</label>${c}</div>`}h+='</div>'}
+$('#ed').innerHTML=h;$('#ed').querySelectorAll('[data-k]').forEach(el=>{el.disabled=locked;
+el.addEventListener('input',()=>{if(locked)return;const[k,f]=el.dataset.k.split('.');tpl[k][f]=typeof DEF[k][f]==='number'?(+el.value||0):el.value;syncHead();renderPrev();save()});
+el.addEventListener('change',commit)});$('#hh1').value=tpl.h1.text;$('#hh2').value=tpl.h2.text}
+function syncHead(){}
+$('#hh1').oninput=()=>{if(locked)return;tpl.h1.text=$('#hh1').value;renderPrev();save()};$('#hh2').oninput=()=>{if(locked)return;tpl.h2.text=$('#hh2').value;renderPrev();save()};
+$('#hh1').onchange=$('#hh2').onchange=commit;
+function commit(){const n=J(tpl);if(n!==last){hist.push(last);fut=[];last=n}}
+function undo(){if(locked||!hist.length)return;fut.push(J(tpl));tpl=JSON.parse(hist.pop());last=J(tpl);buildEd();renderAll()}
+function redo(){if(locked||!fut.length)return;hist.push(J(tpl));tpl=JSON.parse(fut.pop());last=J(tpl);buildEd();renderAll()}
+function resetTpl(){if(locked)return msg('Template is locked.','er');commit();tpl=JSON.parse(J(DEF));commit();last=J(tpl);buildEd();renderAll()}
+function toggleLock(){locked=!locked;$('#lk').textContent=locked?'🔓 Unlock template':'🔒 Lock template';['hh1','hh2'].forEach(i=>$('#'+i).disabled=locked);buildEd();save()}
+const TS=()=>{try{return JSON.parse(localStorage.getItem('plg_tpls')||'{}')}catch(e){return {}}},TW=t=>{try{localStorage.setItem('plg_tpls',J(t))}catch(e){msg('Browser storage unavailable; template not saved.','er')}};
+function tList(){const t=TS();$('#tl').innerHTML='<option value="">Default Manometry Label</option>'+Object.keys(t).map(k=>`<option>${esc(k)}</option>`).join('')}
+function tSave(){const n=$('#tn').value.trim();if(!n)return msg('Enter a template name.','er');const t=TS();t[n]=tpl;TW(t);tList();$('#tl').value=n;msg('Template saved.','ok')}
+function tLoad(){if(locked)return msg('Template is locked.','er');const k=$('#tl').value;commit();tpl=k?JSON.parse(J(TS()[k])):JSON.parse(J(DEF));last=J(tpl);hist.push(J(tpl));buildEd();renderAll()}
+function tDup(){const k=$('#tl').value;if(!k)return msg('Pick a saved template to duplicate.','er');const t=TS();t[k+' copy']=t[k];TW(t);tList()}
+function tDel(){const k=$('#tl').value;if(!k)return msg('The default template cannot be deleted.','er');const t=TS();delete t[k];TW(t);tList()}
+// ---------- exports ----------
+async function dl(b,n){try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:n,data:b});return}}catch(e){if(e&&e.code)return msg(e.code==='declined'?'Download cancelled.':'Download unavailable: '+e.code,'er')}
+const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+function png(r,sc){return new Promise((res,rej)=>{const u=URL.createObjectURL(new Blob([svgOf(r)],{type:'image/svg+xml'})),im=new Image();
+im.onload=()=>{const c=document.createElement('canvas');c.width=tpl.w*sc;c.height=tpl.h*sc;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?res(b):rej(new Error('Canvas export failed')),'image/png')};
+im.onerror=()=>rej(new Error('Could not rasterize label'));im.src=u})}
+function gate(){if(!rows.length){msg('Generate or import labels first.','er');return false}const e=errs();if(e.size){msg('Fix errors before export:\n'+[...e].slice(0,6).map(([i,m])=>`Row ${i+1}: ${m}`).join('\n'),'er');return false}return true}
+const prog=(i,n,t)=>{$('#pb').style.width=(100*i/n)+'%';$('#pl').textContent=`${t} ${i} / ${n} (${Math.round(100*i/n)}%)`};
+const tick=()=>new Promise(r=>setTimeout(r,0));
+async function exPNG(){try{const r=cur(),sc=+$('#sc').value;dl(await png(r,sc),`${r.barcode}${sc>1?'@'+sc+'x':''}.png`)}catch(e){msg('Export failed: '+e.message,'er')}}
+async function exZIP(){if(!gate())return;try{const z=new JSZip(),sc=+$('#sc').value,n=rows.length;for(let i=0;i<n;i++){z.file(rows[i].barcode+'.png',await png(rows[i],sc));if(i%10===0){prog(i+1,n,'Generating labels');await tick()}}
+prog(n,n,'Zipping');const b=await z.generateAsync({type:'blob',compression:'STORE'});dl(b,`labels_${rows[0].barcode}_to_${rows[n-1].barcode}.zip`);msg(`✓ ${n} labels generated successfully`,'ok')}catch(e){msg('ZIP failed: '+e.message,'er')}}
+const b2d=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)});
+async function exPDF(){if(!gate())return;try{const {jsPDF}=window.jspdf,n=rows.length,g=$('#pm').value==='grid';let d;
+if(!g)d=new jsPDF({unit:'px',format:[tpl.w,tpl.h],orientation:'landscape',hotfixes:['px_scaling']});else d=new jsPDF({unit:'pt',format:'a4'});
+const cw=250,ch=cw*tpl.h/tpl.w;
+for(let i=0;i<n;i++){const im=await b2d(await png(rows[i],2));
+if(!g){if(i)d.addPage([tpl.w,tpl.h],'landscape');d.addImage(im,'PNG',0,0,tpl.w,tpl.h)}
+else{const k=i%10;if(i&&!k)d.addPage();d.addImage(im,'PNG',30+(k%2)*285,30+Math.floor(k/2)*(ch+12),cw,ch)}
+if(i%10===0){prog(i+1,n,'Building PDF');await tick()}}
+dl(d.output('blob'),`labels_${rows[0].barcode}_to_${rows[n-1].barcode}.pdf`);msg(`✓ PDF with ${n} labels created`,'ok')}catch(e){msg('PDF failed: '+e.message,'er')}}
+function exCSV(){if(!rows.length)return msg('Nothing to export.','er');dl(new Blob([Papa.unparse(rows.map(r=>({Barcode:r.barcode,'Product Name':r.product,'Imported By':r.importer,'QR Content':qrOf(r)})))],{type:'text/csv'}),'labels.csv')}
+function exProj(){dl(new Blob([J({tpl,rows,locked,v:1})],{type:'application/json'}),'label-project.json')}
+$('#pj').onchange=async ev=>{try{const p=JSON.parse(await ev.target.files[0].text());tpl=p.tpl;rows=p.rows;locked=!!p.locked;sel=0;last=J(tpl);buildEd();renderAll();msg('Project loaded.','ok')}catch(e){msg('Invalid project file.','er')}};
+function save(){clearTimeout(tmr);tmr=setTimeout(()=>{try{localStorage.setItem('plg_auto',J({tpl,rows,locked}));$('#saved').textContent='Last saved just now'}catch(e){$('#saved').textContent='Autosave unavailable'}},500)}
+function toggleTheme(){const r=document.documentElement,d=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0f1115';r.dataset.theme=d?'light':'dark'}
+try{const a=JSON.parse(localStorage.getItem('plg_auto')||'null');if(a&&a.tpl){tpl=a.tpl;rows=a.rows||[];last=J(tpl);if(a.locked)toggleLock()}}catch(e){}
+tList();buildEd();renderAll();if(rows.length)msg(`Restored ${rows.length} labels from your last session.`,'ok');
+</script></body></html>
