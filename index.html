@@ -78,7 +78,9 @@ bc:{type:'CODE128',x:40,y:106,w:553,h:60,bar:2},
 num:{x:373,y:205,size:26,weight:700,ls:11,anchor:'middle'},
 qr:{x:38,y:183,size:178,ecl:'M',quiet:2},
 prod:{x:253,y:267,size:31,weight:700,ls:0,maxw:350},
-imp:{prefix:'IMPORTED BY',x:253,y:303,size:17,weight:400,ls:0,maxw:350}};
+imp:{prefix:'IMPORTED BY',x:253,y:303,size:17,weight:400,ls:0,maxw:350},
+border:{on:1,w:1,color:'#000000',style:'solid'}};
+const fix=t=>{t.border=Object.assign({},DEF.border,t.border);return t};
 let tpl=JSON.parse(J(DEF)),rows=[],sel=0,hist=[],fut=[],locked=false,last=J(tpl),chk=new Set(),tab='seq',tmr;
 const FF='Arial,Helvetica,sans-serif';
 const qrOf=r=>(r.qr!=null&&r.qr!=='')?r.qr:`${r.product}\n${tpl.imp.prefix} ${r.importer}`;
@@ -91,8 +93,10 @@ function qrSVG(t,o){try{const q=qrcode(0,o.ecl);q.addData(t,'Byte');q.make();con
 for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))d+=`M${c+k} ${r+k}h1v1h-1z`;
 return `<svg x="${o.x}" y="${o.y}" width="${o.size}" height="${o.size}" viewBox="0 0 ${tot} ${tot}" shape-rendering="crispEdges"><rect width="${tot}" height="${tot}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`}
 catch(e){return `<text x="${o.x}" y="${o.y+20}" font-size="14" fill="#b00">QR failed (content too long)</text>`}}
+function borderSVG(t){const b=t.border;if(!b||!+b.on||!(+b.w>0))return '';const w=+b.w,c=/^#[0-9a-f]{3,8}$/i.test(b.color)?b.color:'#000000',da=b.style==='dashed'?` stroke-dasharray="${4*w} ${3*w}"`:b.style==='dotted'?` stroke-dasharray="${w} ${2*w}"`:'';
+return `<rect x="${w/2}" y="${w/2}" width="${t.w-w}" height="${t.h-w}" fill="none" stroke="${c}" stroke-width="${w}"${da}/>`}
 // single source of truth renderer: preview and every export use this
-function svgOf(r){const t=tpl;return `<svg xmlns="http://www.w3.org/2000/svg" width="${t.w}" height="${t.h}" viewBox="0 0 ${t.w} ${t.h}"><rect width="${t.w}" height="${t.h}" fill="#fff"/>${T(t.h1,t.h1.text)}${T(t.h2,t.h2.text)}${barSVG(r.barcode,t.bc)}${T(t.num,r.barcode)}${qrSVG(qrOf(r),t.qr)}${T(t.prod,r.product)}${T(t.imp,t.imp.prefix+' '+r.importer)}</svg>`}
+function svgOf(r){const t=tpl;return `<svg xmlns="http://www.w3.org/2000/svg" width="${t.w}" height="${t.h}" viewBox="0 0 ${t.w} ${t.h}"><rect width="${t.w}" height="${t.h}" fill="#fff"/>${T(t.h1,t.h1.text)}${T(t.h2,t.h2.text)}${barSVG(r.barcode,t.bc)}${T(t.num,r.barcode)}${qrSVG(qrOf(r),t.qr)}${T(t.prod,r.product)}${T(t.imp,t.imp.prefix+' '+r.importer)}${borderSVG(t)}</svg>`}
 const live=()=>({barcode:$('#start').value||'0',product:$('#prod').value,importer:$('#comp').value});
 const cur=()=>rows[sel]||live();
 function msg(t,c){const m=$('#msg');m.textContent=t;m.className=c||''}
@@ -134,6 +138,9 @@ const e=errs();msg(e.size?`Imported ${rows.length} rows with ${e.size} problem r
 function buildEd(){let h='';for(const k in DEF){const o=DEF[k];if(typeof o!=='object')continue;h+=`<h3>${k}</h3><div class="g">`;
 for(const f in o){const v=tpl[k][f],id=`${k}.${f}`;let c;if(f==='type')c=`<select data-k="${id}">${['CODE128','CODE39','EAN13','ITF14'].map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
 else if(f==='ecl')c=`<select data-k="${id}">${['L','M','Q','H'].map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
+else if(f==='on')c=`<select data-k="${id}"><option value="1" ${+v?'selected':''}>Yes</option><option value="0" ${+v?'':'selected'}>No</option></select>`;
+else if(f==='style')c=`<select data-k="${id}">${['solid','dashed','dotted'].map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
+else if(f==='color')c=`<input data-k="${id}" type="color" value="${esc(v)}">`;
 else if(f==='anchor')c=`<select data-k="${id}">${['start','middle','end'].map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
 else c=`<input data-k="${id}" ${typeof v==='number'?'type="number" step="any"':''} value="${esc(v)}">`;h+=`<div><label>${f}</label>${c}</div>`}h+='</div>'}
 $('#ed').innerHTML=h;$('#ed').querySelectorAll('[data-k]').forEach(el=>{el.disabled=locked;
@@ -150,7 +157,7 @@ function toggleLock(){locked=!locked;$('#lk').textContent=locked?'🔓 Unlock te
 const TS=()=>{try{return JSON.parse(localStorage.getItem('plg_tpls')||'{}')}catch(e){return {}}},TW=t=>{try{localStorage.setItem('plg_tpls',J(t))}catch(e){msg('Browser storage unavailable; template not saved.','er')}};
 function tList(){const t=TS();$('#tl').innerHTML='<option value="">Default Manometry Label</option>'+Object.keys(t).map(k=>`<option>${esc(k)}</option>`).join('')}
 function tSave(){const n=$('#tn').value.trim();if(!n)return msg('Enter a template name.','er');const t=TS();t[n]=tpl;TW(t);tList();$('#tl').value=n;msg('Template saved.','ok')}
-function tLoad(){if(locked)return msg('Template is locked.','er');const k=$('#tl').value;commit();tpl=k?JSON.parse(J(TS()[k])):JSON.parse(J(DEF));last=J(tpl);hist.push(J(tpl));buildEd();renderAll()}
+function tLoad(){if(locked)return msg('Template is locked.','er');const k=$('#tl').value;commit();tpl=fix(k?JSON.parse(J(TS()[k])):JSON.parse(J(DEF)));last=J(tpl);hist.push(J(tpl));buildEd();renderAll()}
 function tDup(){const k=$('#tl').value;if(!k)return msg('Pick a saved template to duplicate.','er');const t=TS();t[k+' copy']=t[k];TW(t);tList()}
 function tDel(){const k=$('#tl').value;if(!k)return msg('The default template cannot be deleted.','er');const t=TS();delete t[k];TW(t);tList()}
 // ---------- exports ----------
@@ -176,9 +183,9 @@ if(i%10===0){prog(i+1,n,'Building PDF');await tick()}}
 dl(d.output('blob'),`labels_${rows[0].barcode}_to_${rows[n-1].barcode}.pdf`);msg(`✓ PDF with ${n} labels created`,'ok')}catch(e){msg('PDF failed: '+e.message,'er')}}
 function exCSV(){if(!rows.length)return msg('Nothing to export.','er');dl(new Blob([Papa.unparse(rows.map(r=>({Barcode:r.barcode,'Product Name':r.product,'Imported By':r.importer,'QR Content':qrOf(r)})))],{type:'text/csv'}),'labels.csv')}
 function exProj(){dl(new Blob([J({tpl,rows,locked,v:1})],{type:'application/json'}),'label-project.json')}
-$('#pj').onchange=async ev=>{try{const p=JSON.parse(await ev.target.files[0].text());tpl=p.tpl;rows=p.rows;locked=!!p.locked;sel=0;last=J(tpl);buildEd();renderAll();msg('Project loaded.','ok')}catch(e){msg('Invalid project file.','er')}};
+$('#pj').onchange=async ev=>{try{const p=JSON.parse(await ev.target.files[0].text());tpl=fix(p.tpl);rows=p.rows;locked=!!p.locked;sel=0;last=J(tpl);buildEd();renderAll();msg('Project loaded.','ok')}catch(e){msg('Invalid project file.','er')}};
 function save(){clearTimeout(tmr);tmr=setTimeout(()=>{try{localStorage.setItem('plg_auto',J({tpl,rows,locked}));$('#saved').textContent='Last saved just now'}catch(e){$('#saved').textContent='Autosave unavailable'}},500)}
 function toggleTheme(){const r=document.documentElement,d=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0f1115';r.dataset.theme=d?'light':'dark'}
-try{const a=JSON.parse(localStorage.getItem('plg_auto')||'null');if(a&&a.tpl){tpl=a.tpl;rows=a.rows||[];last=J(tpl);if(a.locked)toggleLock()}}catch(e){}
+try{const a=JSON.parse(localStorage.getItem('plg_auto')||'null');if(a&&a.tpl){tpl=fix(a.tpl);rows=a.rows||[];last=J(tpl);if(a.locked)toggleLock()}}catch(e){}
 tList();buildEd();renderAll();if(rows.length)msg(`Restored ${rows.length} labels from your last session.`,'ok');
 </script></body></html>
